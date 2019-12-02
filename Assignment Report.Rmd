@@ -1,0 +1,116 @@
+---
+title: "Assignement Report"
+author: "Zine Eddine Bouzennoune"
+date: "Decemner 2nd, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Human Activity Recognition
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants, to classify into 5 categories, the type of exercise people are doing.
+
+First, we download the data that is available in these two links:
+
+Test set:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Training set:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The whole data for this project come from this source:
+
+http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har.
+
+#### Discovering the data set
+To do so, we should first load the necessary packages for our program.
+
+```{r, loading R packages}
+
+library(skimr)
+library(tidyverse)
+library(caret)
+
+```
+The package 'skimr' was used to get a good summary of the dataset. The command that shows this is: skim(dataset). Tidyverse was loaded in order to use the different packages and functions like ggplot, the pipe operator, and many other useful commands. Finally, the caret package was used to train the machine learning model.
+
+#loading the test and training datasets and setting the seed for reproducible results
+```{r}
+set.seed(seed = 123)
+
+setwd(dir='C:\\Users\\zineeddine.bouzennou\\OneDrive\\Coursera\\JHDSS\\Practical Machine Learning')
+
+training <- read.csv('pml-training.csv', stringsAsFactors = F)
+
+testing <- read.csv('pml-testing.csv', stringsAsFactors = F)
+```
+
+First, we use skim to have a good summary of the dataset:
+
+```{r}
+skim(training)
+```
+We can see that we have three types of variables: character, integer, and numeric. Usually, character variables have a low number of missing, but most of them are full with empty values. Integer variables are mostly measurements of the x,y,z axis, and numeric ones are mostly aggregrations (avg, min, max etc.).
+
+If we dig deeper, into the dataset, we can see that aggregation variables like (min, max,avg) are related to the column: new_window. Each time the new_window is 'yes', those columns contain values, otherwise they are empty. Also, when looking at the data, two values are problematic: the empty character '' and the '#DIV/0!'. We have replaced both values with 'NA' as shown in the next code chunk.
+
+```{r}
+training <- replace(training,training=='' || training=='#DIV/0!',NA)
+
+```
+
+Next thing was to delete the class column from the dataset, along with raw_timestamp_part_1 which we considered not really useful. Then we created two datasets for predictors and output as: x.t1 for predictors and y.t for outcome, as shown below.
+
+```{r}
+x.t <- training[, -which(names(training) %in% c("classe","raw_timestamp_part_1"))]
+y.t <- training[, which(names(training) == "classe")]
+```
+
+Then, because of the high number of NA's in the dataset, we removed all columns that has more than one NA in them, along with those which still has the empty character.
+
+```{r}
+x.t1 <- x.t[,colSums(is.na(x.t))<1 ]
+x.t1 <-  x.t1[,colSums(x.t1=='')<1]
+```
+then, after checking the dataset, we've found that there are many columns with character type. That's why we have eliminated all of these.
+
+```{r}
+x.t1 <- x.t1[, !sapply(x.t1, is.character)]
+```
+
+After several iterations training the model, we've found that the best predictors where those variables that are numeric and had 'x','y','z' at the end. That's why we decided to train the final model with only these predictors. We rejoined the outcome y.t to the set of predictors x.t1 before passing it to the train function.
+
+```{r}
+x.t1 <- x.t1[,which((str_sub(names(x.t1),-1)%in% c('x','y','z'))) ]
+x.t1 <- cbind(x.t1,y.t)
+```
+The model used was gbm, because it supports multi-class prediction and can give a very good result with a bunch of good learners.
+
+```{r eval=F}
+modFit<-train(y.t~., method="gbm",data=x.t1,verbose=F)
+```
+
+The result modFit are below:
+
+Stochastic Gradient Boosting 
+
+19622 samples
+   36 predictor
+    5 classes: 'A', 'B', 'C', 'D', 'E' 
+
+No pre-processing
+
+The final values used for the model were n.trees = 150, interaction.depth = 3, shrinkage = 0.1 and n.minobsinnode = 10.
+
+Note that this result on the training set, is very coherent with the one of the testing set:90%. This was the best model we could get.
+
+
+
+
+
+
